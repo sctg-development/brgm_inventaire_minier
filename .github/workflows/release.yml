@@ -133,6 +133,7 @@ jobs:
 
     - name: Generate build provenance attestation
       uses: actions/attest-build-provenance@v1
+      continue-on-error: true
       with:
         subject-path: geological_data_with_altitude_${{ steps.date.outputs.date }}.tar.gz
 
@@ -146,10 +147,18 @@ jobs:
 
           ## Coverage
           - **Auvergne-Rhône-Alpes**: 12 departments
-          - **Grand Est + Bourgogne-Franche-Comté**: 18 departments  
+          - **Bourgogne-Franche-Comté**: 8 departments
+          - **Bretagne**: 4 departments
+          - **Centre-Val de Loire**: 6 departments
+          - **Corse**: 2 departments
+          - **Grand Est**: 10 departments
+          - **Hauts-de-France**: 5 departments
+          - **Île-de-France**: 8 departments
+          - **Normandie**: 5 departments
           - **Nouvelle-Aquitaine**: 12 departments
-          - **Occitanie + Corse + Provence-Alpes-Côte d'Azur**: 20 departments
-          - **Île-de-France + Centre-Val de Loire + Hauts-de-France + Normandie + Bretagne + Pays de la Loire**: 31 departments
+          - **Occitanie**: 12 departments
+          - **Pays de la Loire**: 5 departments
+          - **Provence-Alpes-Côte d'Azur**: 6 departments
 
           Total: All 96 French departments with geological point data enhanced with elevation data.
 
@@ -157,7 +166,7 @@ jobs:
           - `geological_data_with_altitude_${{ steps.date.outputs.date }}.tar.gz`: Archive containing ZIP files for all regions with altitude data
 
           ## Attestation
-          This release includes a build provenance attestation to verify the integrity and origin of the artifacts.
+          This release may include a build provenance attestation to verify the integrity and origin of the artifacts (requires ID tokens to be enabled in repository settings).
         files: |
           geological_data_with_altitude_${{ steps.date.outputs.date }}.tar.gz
       env:
