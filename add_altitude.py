@@ -350,7 +350,7 @@ def download_and_process_brgm(dest_dir, departments=None, keep_temp=False):
     """
     Download BRGM department ZIP files and process each downloaded ZIP into `dest_dir` preserving ZIP output.
     """
-    base_url = "http://infoterre.brgm.fr/telechargements/BDCharm50/GEO050K_HARM_"
+    base_url = "https://infoterre.brgm.fr/telechargements/BDCharm50/GEO050K_HARM_"
 
     if departments:
         codes = departments
@@ -401,6 +401,56 @@ def download_and_process_brgm(dest_dir, departments=None, keep_temp=False):
 
         except Exception as e:
             print(f"Error downloading or processing Île-de-France: {e}")
+        finally:
+            if not keep_temp:
+                try:
+                    if 'tmp_path' in locals() and os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+                except Exception:
+                    pass
+        return
+
+    # Special case for Nord-Pas-de-Calais (59, 62): departments are in a single ZIP file
+    nord_pas_de_calais_deps = {'059', '062'}
+    if departments and set(departments) == nord_pas_de_calais_deps:
+        # Download the single Nord-Pas-de-Calais ZIP file
+        zip_filename = "GEO050K_HARM_059_062.zip"
+        if keep_temp:
+            tmp_path = os.path.join(tempfile.gettempdir(), zip_filename)
+            if os.path.exists(tmp_path):
+                print(f"Reusing existing Nord-Pas-de-Calais ZIP from {tmp_path}")
+                try:
+                    process_zip_file(tmp_path, dest_dir)
+                except Exception as e:
+                    print(f"Error processing Nord-Pas-de-Calais ZIP: {e}")
+                return
+        
+        url = f"{base_url}059_062.zip"
+        print(f"Downloading BRGM ZIP for Nord-Pas-de-Calais from {url}")
+        try:
+            resp = requests.get(url, stream=True, timeout=30)
+            if resp.status_code != 200:
+                print(f"  -> Not available (status {resp.status_code}), skipping Nord-Pas-de-Calais")
+                return
+
+            if keep_temp:
+                tmp_path = os.path.join(tempfile.gettempdir(), zip_filename)
+                with open(tmp_path, 'wb') as f:
+                    for chunk in resp.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+            else:
+                with tempfile.NamedTemporaryFile(suffix="_nord_pas_de_calais.zip", delete=False) as tmp:
+                    for chunk in resp.iter_content(chunk_size=8192):
+                        if chunk:
+                            tmp.write(chunk)
+                    tmp_path = tmp.name
+
+            # Process the ZIP and write resulting ZIP to dest_dir
+            process_zip_file(tmp_path, dest_dir)
+
+        except Exception as e:
+            print(f"Error downloading or processing Nord-Pas-de-Calais: {e}")
         finally:
             if not keep_temp:
                 try:
