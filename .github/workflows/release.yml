@@ -84,12 +84,22 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests numpy geopandas
 
+    - name: Cache BRGM downloads and tiles
+      uses: actions/cache@v4
+      with:
+        path: |
+          temp
+        key: brgm-cache-${{ matrix.region }}-${{ hashFiles('**/add_altitude.py') }}
+        restore-keys: |
+          brgm-cache-${{ matrix.region }}-
+          brgm-cache-
+
     - name: Create output directory
       run: mkdir -p output_${{ matrix.region }}
 
     - name: Run altitude augmentation script for ${{ matrix.name }}
       run: |
-        python add_altitude.py --from-brgm --out output_${{ matrix.region }} --departments ${{ matrix.departments }}
+        python add_altitude.py --from-brgm --out output_${{ matrix.region }} --departments ${{ matrix.departments }} --temp-dir temp
 
     - name: Upload processed ZIPs
       uses: actions/upload-artifact@v4
