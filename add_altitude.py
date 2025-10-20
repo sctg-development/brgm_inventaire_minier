@@ -63,7 +63,7 @@ LAYER = 'ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES'
 TILE_SIZE = 10000  # 10km tiles
 PIXEL_SIZE = 25    # 25m resolution
 TILE_PIXELS = TILE_SIZE // PIXEL_SIZE  # 400 pixels
-
+TILE_FORMAT = "image/x-bil;bits=32"  # Binary format for raw float32 data
 # Cache for downloaded tiles
 tile_cache = {}
 
@@ -131,12 +131,14 @@ def get_altitude(x, y):
                     # Download and save
                     os.makedirs(os.path.dirname(cache_file), exist_ok=True)
                     bbox = f"{x_min},{y_min},{x_max},{y_max}"
-                    print(f"Downloading tile for BBOX: {bbox}")
+                    
                     url = (
                         f"{WMS_URL}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap"
                         f"&BBOX={bbox}&CRS=EPSG:2154&WIDTH={TILE_PIXELS}&HEIGHT={TILE_PIXELS}"
-                        f"&LAYERS={LAYER}&STYLES=&FORMAT=image/x-bil;bits=32"
+                        f"&LAYERS={LAYER}&STYLES=&FORMAT={TILE_FORMAT}"
                     )
+
+                    print(f"Downloading tile for BBOX: {bbox} from {url}")
                     
                     # Download the tile with retry
                     response = download_tile_with_retry(url)
@@ -148,13 +150,14 @@ def get_altitude(x, y):
             else:
                 # Download without saving
                 bbox = f"{x_min},{y_min},{x_max},{y_max}"
-                print(f"Downloading tile for BBOX: {bbox}")
+                
                 url = (
                     f"{WMS_URL}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap"
                     f"&BBOX={bbox}&CRS=EPSG:2154&WIDTH={TILE_PIXELS}&HEIGHT={TILE_PIXELS}"
-                    f"&LAYERS={LAYER}&STYLES=&FORMAT=image/x-bil;bits=32"
+                    f"&LAYERS={LAYER}&STYLES=&FORMAT={TILE_FORMAT}"
                 )
-                
+
+                print(f"Downloading tile for BBOX: {bbox} from {url}")
                 # Download the tile with retry
                 response = download_tile_with_retry(url)
                 
@@ -173,8 +176,13 @@ def get_altitude(x, y):
         pixel_x = max(0, min(pixel_x, TILE_PIXELS - 1))
         pixel_y = max(0, min(pixel_y, TILE_PIXELS - 1))
         
+        # WMS tiles have Y axis inverted (origin at bottom-left in Lambert 93)
+        # NumPy arrays have Y axis at top (origin at top-left)
+        # So we need to invert: pixel_y = TILE_PIXELS - 1 - pixel_y
+        pixel_y_inverted = TILE_PIXELS - 1 - pixel_y
+        
         # Extract altitude value
-        value = data[pixel_y, pixel_x]
+        value = data[pixel_y_inverted, pixel_x]
         
         return float(value)
     
