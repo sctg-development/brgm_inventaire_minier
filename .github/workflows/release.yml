@@ -124,18 +124,23 @@ jobs:
       id: date
       run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
 
-    - name: Create release archive
+    - name: Flatten ZIP files
       run: |
         cd all_zips
         find . -name "*.zip" -exec mv {} . \;
         rm -rf brgm-data-*
-        tar -czf ../geological_data_with_altitude_${{ steps.date.outputs.date }}.tar.gz *
+        ls -la *.zip
 
-    - name: Generate build provenance attestation
-      uses: actions/attest-build-provenance@v1
+    - name: Generate build provenance attestation for each ZIP
       continue-on-error: true
-      with:
-        subject-path: geological_data_with_altitude_${{ steps.date.outputs.date }}.tar.gz
+      run: |
+        cd all_zips
+        for zip_file in *.zip; do
+          echo "Generating attestation for $zip_file"
+          gh attestation create "$zip_file" --predicate-type slsaprovenance
+        done
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
@@ -144,6 +149,8 @@ jobs:
         name: Geological Data with Altitude - ${{ steps.date.outputs.date }}
         body: |
           This release contains BRGM geological data for all French administrative regions augmented with altitude information from IGN.
+
+          Each region is provided as a separate ZIP file for individual download.
 
           ## Coverage
           - **Auvergne-Rhône-Alpes**: 12 departments
@@ -160,14 +167,22 @@ jobs:
           - **Pays de la Loire**: 5 departments
           - **Provence-Alpes-Côte d'Azur**: 6 departments
 
-          Total: All 96 French departments with geological point data enhanced with elevation data.
+          **Total**: All 96 French departments with geological point data enhanced with elevation data.
 
-          ## Files
-          - `geological_data_with_altitude_${{ steps.date.outputs.date }}.tar.gz`: Archive containing ZIP files for all regions with altitude data
+          ## Download Options
+          - Download individual region ZIP files (recommended for bandwidth efficiency)
+          - Each ZIP file contains all geological data for that region with altitude information added
 
-          ## Attestation
-          This release may include a build provenance attestation to verify the integrity and origin of the artifacts (requires ID tokens to be enabled in repository settings).
+          ## Data Format
+          Each ZIP file contains shapefiles with the following attributes:
+          - All original BRGM attributes
+          - **ALTITUDE**: Elevation in meters (from IGN WMS service, 25m resolution)
+
+          ## Notes
+          - Files are compressed using ZIP format with deflate compression
+          - Each department's data is included in the regional ZIP files
+          - Coordinates are in EPSG:2154 (Lambert 93, France-specific projection)
         files: |
-          geological_data_with_altitude_${{ steps.date.outputs.date }}.tar.gz
+          all_zips/*.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
