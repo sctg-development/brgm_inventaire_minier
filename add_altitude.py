@@ -48,6 +48,7 @@ import sys
 import json
 import requests
 import numpy as np
+import time
 import zipfile
 import tempfile
 import shutil
@@ -68,6 +69,34 @@ tile_cache = {}
 
 # Temp dir for persistent cache
 persistent_temp_dir = None
+
+def download_tile_with_retry(url, max_retries=3, delay=60):
+    """
+    Download a tile with retry logic for network errors.
+    
+    Args:
+        url (str): The URL to download from
+        max_retries (int): Maximum number of retry attempts
+        delay (int): Delay in seconds between retries
+        
+    Returns:
+        requests.Response: The response object
+        
+    Raises:
+        Exception: If all retries fail
+    """
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            return response
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                print(f"Request failed (attempt {attempt + 1}/{max_retries}): {e}")
+                print(f"Retrying in {delay} seconds...")
+                time.sleep(delay)
+            else:
+                raise e
 
 def get_altitude(x, y):
     """
@@ -109,9 +138,8 @@ def get_altitude(x, y):
                         f"&LAYERS={LAYER}&STYLES=&FORMAT=image/x-bil;bits=32"
                     )
                     
-                    # Download the tile
-                    response = requests.get(url)
-                    response.raise_for_status()
+                    # Download the tile with retry
+                    response = download_tile_with_retry(url)
                     
                     # Read as float32 array
                     data = np.frombuffer(response.content, dtype=np.float32).reshape((TILE_PIXELS, TILE_PIXELS))
@@ -127,9 +155,8 @@ def get_altitude(x, y):
                     f"&LAYERS={LAYER}&STYLES=&FORMAT=image/x-bil;bits=32"
                 )
                 
-                # Download the tile
-                response = requests.get(url)
-                response.raise_for_status()
+                # Download the tile with retry
+                response = download_tile_with_retry(url)
                 
                 # Read as float32 array
                 data = np.frombuffer(response.content, dtype=np.float32).reshape((TILE_PIXELS, TILE_PIXELS))
