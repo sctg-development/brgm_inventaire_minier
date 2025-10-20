@@ -333,6 +333,56 @@ def download_and_process_brgm(dest_dir, departments=None, keep_temp=False):
         codes.insert(1, '02A')
         codes.insert(2, '02B')
 
+    # Special case for Île-de-France: all departments are in a single ZIP file
+    ile_de_france_deps = {'075', '077', '078', '091', '092', '093', '094', '095'}
+    if departments and set(departments) == ile_de_france_deps:
+        # Download the single Île-de-France ZIP file
+        zip_filename = "GEO050K_HARM_075_077_078_091_092_093_094_095.zip"
+        if keep_temp:
+            tmp_path = os.path.join(tempfile.gettempdir(), zip_filename)
+            if os.path.exists(tmp_path):
+                print(f"Reusing existing Île-de-France ZIP from {tmp_path}")
+                try:
+                    process_zip_file(tmp_path, dest_dir)
+                except Exception as e:
+                    print(f"Error processing Île-de-France ZIP: {e}")
+                return
+        
+        url = f"{base_url}075_077_078_091_092_093_094_095.zip"
+        print(f"Downloading BRGM ZIP for Île-de-France from {url}")
+        try:
+            resp = requests.get(url, stream=True, timeout=30)
+            if resp.status_code != 200:
+                print(f"  -> Not available (status {resp.status_code}), skipping Île-de-France")
+                return
+
+            if keep_temp:
+                tmp_path = os.path.join(tempfile.gettempdir(), zip_filename)
+                with open(tmp_path, 'wb') as f:
+                    for chunk in resp.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+            else:
+                with tempfile.NamedTemporaryFile(suffix="_ile_de_france.zip", delete=False) as tmp:
+                    for chunk in resp.iter_content(chunk_size=8192):
+                        if chunk:
+                            tmp.write(chunk)
+                    tmp_path = tmp.name
+
+            # Process the ZIP and write resulting ZIP to dest_dir
+            process_zip_file(tmp_path, dest_dir)
+
+        except Exception as e:
+            print(f"Error downloading or processing Île-de-France: {e}")
+        finally:
+            if not keep_temp:
+                try:
+                    if 'tmp_path' in locals() and os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+                except Exception:
+                    pass
+        return
+
     for code in codes:
         zip_filename = f"GEO050K_HARM_{code}.zip"
         if keep_temp:
