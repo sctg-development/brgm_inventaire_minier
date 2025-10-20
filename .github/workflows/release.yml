@@ -109,6 +109,10 @@ jobs:
 
   create-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
     needs: process-departments
 
     steps:
@@ -131,16 +135,17 @@ jobs:
         rm -rf brgm-data-*
         ls -la *.zip
 
-    - name: Generate build provenance attestation for each ZIP
-      continue-on-error: true
+    - name: Handle combined departments
       run: |
         cd all_zips
-        for zip_file in *.zip; do
-          echo "Generating attestation for $zip_file"
-          gh attestation create "$zip_file" --predicate-type slsaprovenance
-        done
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        mv GEO050K_HARM_062.zip GEO050K_HARM_059_062.zip
+        mv GEO050K_HARM_095.zip GEO050K_HARM_075_077_078_091_092_093_094_095.zip
+
+    - name: Generate build provenance attestations
+      uses: actions/attest-build-provenance@v1
+      continue-on-error: true
+      with:
+        subject-path: all_zips/*.zip
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
