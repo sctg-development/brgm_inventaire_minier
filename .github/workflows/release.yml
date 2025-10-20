@@ -1,0 +1,154 @@
+# Copyright (c) 2025 Ronan Le Meillat - SCTG Development
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+name: Create Release with Augmented Data
+
+on:
+  workflow_dispatch:
+
+jobs:
+  process-departments:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        region: ["auvergne-rhone-alpes", "bourgogne-franche-comte", "bretagne", "centre-val-de-loire", "corse", "grand-est", "hauts-de-france", "ile-de-france", "normandie", "nouvelle-aquitaine", "occitanie", "pays-de-la-loire", "provence-alpes-cote-d-azur"]
+        include:
+          - region: "auvergne-rhone-alpes"
+            departments: "001,003,007,015,026,038,042,043,063,069,073,074"
+            name: "Auvergne-Rhône-Alpes"
+          - region: "bourgogne-franche-comte"
+            departments: "021,025,039,058,070,071,089,090"
+            name: "Bourgogne-Franche-Comté"
+          - region: "bretagne"
+            departments: "022,029,035,056"
+            name: "Bretagne"
+          - region: "centre-val-de-loire"
+            departments: "018,028,036,037,041,045"
+            name: "Centre-Val de Loire"
+          - region: "corse"
+            departments: "02A,02B"
+            name: "Corse"
+          - region: "grand-est"
+            departments: "008,010,051,052,054,055,057,067,068,088"
+            name: "Grand Est"
+          - region: "hauts-de-france"
+            departments: "002,059,060,062,080"
+            name: "Hauts-de-France"
+          - region: "ile-de-france"
+            departments: "075,077,078,091,092,093,094,095"
+            name: "Île-de-France"
+          - region: "normandie"
+            departments: "014,027,050,061,076"
+            name: "Normandie"
+          - region: "nouvelle-aquitaine"
+            departments: "016,017,019,023,024,033,040,047,064,079,086,087"
+            name: "Nouvelle-Aquitaine"
+          - region: "occitanie"
+            departments: "009,011,030,031,032,034,046,048,065,066,081,082"
+            name: "Occitanie"
+          - region: "pays-de-la-loire"
+            departments: "044,049,053,072,085"
+            name: "Pays de la Loire"
+          - region: "provence-alpes-cote-d-azur"
+            departments: "004,005,006,013,083,084"
+            name: "Provence-Alpes-Côte d'Azur"
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests numpy geopandas
+
+    - name: Create output directory
+      run: mkdir -p output_${{ matrix.region }}
+
+    - name: Run altitude augmentation script for ${{ matrix.name }}
+      run: |
+        python add_altitude.py --from-brgm --out output_${{ matrix.region }} --departments ${{ matrix.departments }}
+
+    - name: Upload processed ZIPs
+      uses: actions/upload-artifact@v4
+      with:
+        name: brgm-data-${{ matrix.region }}
+        path: output_${{ matrix.region }}/*.zip
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: process-departments
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download all processed ZIPs
+      uses: actions/download-artifact@v4
+      with:
+        path: all_zips
+
+    - name: Generate ISO8601 date
+      id: date
+      run: echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+    - name: Create release archive
+      run: |
+        cd all_zips
+        find . -name "*.zip" -exec mv {} . \;
+        rm -rf brgm-data-*
+        tar -czf ../geological_data_with_altitude_${{ steps.date.outputs.date }}.tar.gz *
+
+    - name: Generate build provenance attestation
+      uses: actions/attest-build-provenance@v1
+      with:
+        subject-path: geological_data_with_altitude_${{ steps.date.outputs.date }}.tar.gz
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.date.outputs.date }}
+        name: Geological Data with Altitude - ${{ steps.date.outputs.date }}
+        body: |
+          This release contains BRGM geological data for all French administrative regions augmented with altitude information from IGN.
+
+          ## Coverage
+          - **Auvergne-Rhône-Alpes**: 12 departments
+          - **Grand Est + Bourgogne-Franche-Comté**: 18 departments  
+          - **Nouvelle-Aquitaine**: 12 departments
+          - **Occitanie + Corse + Provence-Alpes-Côte d'Azur**: 20 departments
+          - **Île-de-France + Centre-Val de Loire + Hauts-de-France + Normandie + Bretagne + Pays de la Loire**: 31 departments
+
+          Total: All 96 French departments with geological point data enhanced with elevation data.
+
+          ## Files
+          - `geological_data_with_altitude_${{ steps.date.outputs.date }}.tar.gz`: Archive containing ZIP files for all regions with altitude data
+
+          ## Attestation
+          This release includes a build provenance attestation to verify the integrity and origin of the artifacts.
+        files: |
+          geological_data_with_altitude_${{ steps.date.outputs.date }}.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
