@@ -263,10 +263,10 @@ def process_shapefile(file_path, dest_dir):
         
         points_gdf['ALTITUDE'] = altitudes
         
-        # Save as Shapefile
+        # Save as Shapefile with UTF-8 encoding in metadata
         base_name = Path(file_path).stem
         dest_path = os.path.join(dest_dir, base_name)
-        points_gdf.to_file(dest_path + '.shp')
+        points_gdf.to_file(dest_path + '.shp', driver='ESRI Shapefile', encoding='utf-8')
         print(f"Processed and saved: {dest_path}.shp")
         
     except Exception as e:
@@ -345,10 +345,10 @@ def process_shapefile_inplace(file_path, dest_dir):
         
         points_gdf['ALTITUDE'] = altitudes
         
-        # Save in the same location
+        # Save in the same location with UTF-8 encoding in metadata
         base_name = Path(file_path).stem
         dest_path = os.path.join(dest_dir, base_name)
-        points_gdf.to_file(dest_path + '.shp')
+        points_gdf.to_file(dest_path + '.shp', driver='ESRI Shapefile', encoding='utf-8')
         
     except Exception as e:
         print(f"Error processing shapefile {file_path}: {e}")
