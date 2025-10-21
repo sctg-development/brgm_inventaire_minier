@@ -167,4 +167,4 @@ Each release contains data for all 96 French departments across 13 regions:
 
 ## License
 
-This project is for educational purposes. Ensure compliance with BRGM and IGN data usage policies.
+This project is licensed under the MIT License for educational purposes. Ensure compliance with BRGM and IGN data usage policies.
